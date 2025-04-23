@@ -1,0 +1,78 @@
+.data
+    A: .word 1, 2, 3, 1, 2, 3, 1, 2, 3 # Matriz A, 3x3
+    B: .word 3, 2, 1, 3, 2, 1, 3, 2, 1 # Matriz B, 3x3
+    C: .space 36 # Matriz C, espacio para 9 enteros (3x3)
+
+.text
+    init:
+        la a0, A # cargar la dirección de A en a0
+        la a1, B # cargar la dirección de B en a1
+        la a2, C # cargar la dirección de C en a2
+
+    setRegs:
+        li t3, 3 # tamaño de las matrices (3)
+
+    set_i:
+        li t0, 0 # inicializar i en 0
+
+    loopi: # ciclo para recorrer filas de A
+        bge t0, t3, DONE # si i >= 3, termina
+        li t1, 0 # inicializar j (columnas) en 0
+
+    loopj: # ciclo para recorrer columnas de B
+        bge t1, t3, loopi_inc # si j >= 3, pasar a siguiente fila
+
+        # Aquí va el cálculo de la dirección de C[i][j]
+        mul t4, t0, t3 # i * 3
+        add t4, t4, t1 # i * 3 + j
+        slli t4, t4, 2 # offset por tamaño de palabra (4 bytes)
+        add t5, a2, t4 # dirección de C[i][j]
+
+        li s2, 0 # inicializar C[i][j] en 0
+        sw s2, 0(t5) # guardar 0 en C[i][j]
+
+        li t2, 0 # inicializar k en 0
+
+    loopk: # ciclo para k (cálculo de A[i][k] * B[k][j])
+        bge t2, t3, loopj_inc # si k >= 3, ir a la siguiente columna
+
+        # Calcular dirección de A[i][k]
+        mul t4, t0, t3 
+        add t4, t4, t2 
+        slli t4, t4, 2 
+        add t5, a0, t4 
+        lw t6, 0(t5) # cargar A[i][k]
+
+        # Calcular dirección de B[k][j]
+        mul t4, t2, t3 
+        add t4, t4, t1 
+        slli t4, t4, 2 
+        add t5, a1, t4 
+        lw s0, 0(t5) # cargar B[k][j]
+
+        # Multiplicar A[i][k] * B[k][j]
+        mul s1, t6, s0 
+
+        # Calcular dirección de C[i][j] otra vez
+        mul t4, t0, t3 
+        add t4, t4, t1 
+        slli t4, t4, 2 
+        add t5, a2, t4 
+        lw s2, 0(t5) # cargar valor actual de C[i][j]
+
+        add s2, s2, s1 # C[i][j] += A[i][k] * B[k][j]
+        sw s2, 0(t5) # guardar nuevo valor
+
+        addi t2, t2, 1 # k = k + 1
+        j loopk # volver a loopk
+
+    loopj_inc: # aumentar j
+        addi t1, t1, 1
+        j loopj
+
+    loopi_inc: # aumentar i
+        addi t0, t0, 1
+        j loopi
+
+    DONE:
+        li a7, 10 # syscall para salir
