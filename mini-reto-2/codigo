@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <string.h>
 
-/* LCD - Pines en PTA */
+/* === LCD: Pines en PTA === */
 #define RS (1 << 2)
 #define EN (1 << 1)
 #define D4 (1 << 4)
@@ -11,18 +11,15 @@
 #define D7 (1 << 13)
 #define LCD_MASK (RS | EN | D4 | D5 | D6 | D7)
 
-/* Botón en PTC12 */
-#define BUTTON_PORT PORTC
-#define BUTTON_GPIO PTC
-#define BUTTON_PIN  12
-#define BUTTON_MASK (1 << BUTTON_PIN)
+/* === Variables globales === */
+volatile uint32_t count = 0;
 
 /* === Delay con SysTick === */
 void delayMs(int n) {
     SysTick->LOAD = (48000 * n) - 1; // 48 MHz → 48000 ciclos/ms
     SysTick->VAL = 0;
     SysTick->CTRL = 5; // Habilita SysTick con reloj interno
-    while ((SysTick->CTRL & 0x10000) == 0); // Espera a que se ponga en 1
+    while ((SysTick->CTRL & 0x10000) == 0); // Espera
     SysTick->CTRL = 0;
 }
 
@@ -93,39 +90,49 @@ void lcd_print(char *str) {
     while (*str) lcd_data(*str++);
 }
 
-/* === Inicializar botón === */
-void init_button(void) {
-    SIM->SCGC5 |= SIM_SCGC5_PORTC_MASK;
-    BUTTON_PORT->PCR[BUTTON_PIN] = PORT_PCR_MUX(1) | PORT_PCR_PE_MASK | PORT_PCR_PS_MASK; // Pull-up
-    BUTTON_GPIO->PDDR &= ~BUTTON_MASK; // Entrada
+/* === Configurar TPM0_CH0 como input capture en PTC1 === */
+void init_tpm_input_capture(void) {
+    SIM->SCGC5 |= SIM_SCGC5_PORTC_MASK; // Reloj PORTC
+    PORTC->PCR[1] = PORT_PCR_MUX(4);    // PTC1 como TPM0_CH0 (ALT4)
+
+    SIM->SCGC6 |= SIM_SCGC6_TPM0_MASK;  // Reloj TPM0
+    SIM->SOPT2 |= SIM_SOPT2_TPMSRC(1);  // MCGFLLCLK (48 MHz)
+
+    TPM0->SC = 0;               // Deshabilitar TPM para configurar
+    TPM0->MOD = 0xFFFF;         // Valor máximo
+
+    // Configurar canal 0 para captura de flanco de bajada con interrupción
+    TPM0->CONTROLS[0].CnSC = TPM_CnSC_ELSB_MASK | TPM_CnSC_CHIE_MASK;
+
+    TPM0->SC = TPM_SC_CMOD(1) | TPM_SC_PS(7); // LPTPM_CLK / 128
+    NVIC_EnableIRQ(TPM0_IRQn); // Habilitar interrupción en NVIC
+}
+
+/* === Interrupción TPM0 === */
+void TPM0_IRQHandler(void) {
+    if (TPM0->CONTROLS[0].CnSC & TPM_CnSC_CHF_MASK) {
+        TPM0->CONTROLS[0].CnSC |= TPM_CnSC_CHF_MASK; // Limpiar bandera
+        count++;
+    }
 }
 
 /* === Programa principal === */
 int main(void) {
     char buffer[16];
-    uint32_t count = -1;
-    uint8_t last_state = 1;
-    uint8_t current_state;
+    uint32_t last_count = -1;
 
     lcd_init();
     lcd_clear();
-    init_button();
-
-    // Mostrar conteo inicial
-    sprintf(buffer, "Conteo: %lu", count);
-    lcd_print(buffer);
+    init_tpm_input_capture();
 
     while (1) {
-        current_state = (BUTTON_GPIO->PDIR & BUTTON_MASK) ? 1 : 0;
-
-        if (last_state == 1 && current_state == 0) { // Flanco de bajada
-            count++;
+        if (count != last_count) {
+            last_count = count;
             sprintf(buffer, "Conteo: %lu", count);
             lcd_clear();
             lcd_print(buffer);
-            delayMs(20); // Antirebote
+            delayMs(200); // Evitar parpadeo excesivo
         }
-
-        last_state = current_state;
     }
 }
+
