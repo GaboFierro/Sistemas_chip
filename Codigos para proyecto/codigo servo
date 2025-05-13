@@ -1,0 +1,50 @@
+#include "MKL25Z4.h"
+
+#define PWM_FREQUENCY 50
+#define TPM1_MOD_VALUE (48000000 / PWM_FREQUENCY) // 960000 para 20ms
+
+void init_PWM_PTB1(void) {
+    SIM->SCGC5 |= SIM_SCGC5_PORTB_MASK;
+    SIM->SCGC6 |= SIM_SCGC6_TPM1_MASK;
+
+    PORTB->PCR[1] &= ~PORT_PCR_MUX_MASK;
+    PORTB->PCR[1] |= PORT_PCR_MUX(3); // PTB1 como TPM1_CH1
+
+    SIM->SOPT2 |= SIM_SOPT2_TPMSRC(1);
+
+    TPM1->MOD = TPM1_MOD_VALUE - 1;
+
+    TPM1->CONTROLS[1].CnSC = TPM_CnSC_MSB_MASK | TPM_CnSC_ELSB_MASK;
+    TPM1->CONTROLS[1].CnV = 48000; // ángulo inicial 0°
+
+    TPM1->SC = TPM_SC_CMOD(1) | TPM_SC_PS(0);
+}
+
+void set_servo_angle(int angle) {
+    uint32_t pulse_width = 48000 + (angle * (96000 - 48000)) / 180;
+    TPM1->CONTROLS[1].CnV = pulse_width;
+}
+
+void delay_ms(uint32_t ms) {
+    for (uint32_t i = 0; i < ms * 6000; i++) {
+        __NOP();
+    }
+}
+
+int main(void) {
+    init_PWM_PTB1();
+
+    while (1) {
+        // Subida de 0° a 180°
+        for (int angle = 0; angle <= 180; angle += 10) {
+            set_servo_angle(angle);
+            delay_ms(200); // Delay entre pasos
+        }
+
+        // Bajada de 180° a 0°
+        for (int angle = 180; angle >= 0; angle -= 10) {
+            set_servo_angle(angle);
+            delay_ms(200);
+        }
+    }
+}
