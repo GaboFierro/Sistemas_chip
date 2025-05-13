@@ -39,7 +39,6 @@ void set_servo_angle(int angle) {
     TPM1->CONTROLS[1].CnV = pulse;
 }
 
-// === DELAY ===
 void delay_ms(uint32_t ms) {
     for (uint32_t i = 0; i < ms * 6000; i++) __NOP();
 }
@@ -101,7 +100,7 @@ void init_LCD(void) {
     delay_ms(2);
 }
 
-// === TECLADO MATRICIAL ===
+// === TECLADO ===
 void init_keypad(void) {
     SIM->SCGC5 |= SIM_SCGC5_PORTC_MASK;
     for (int i = 0; i < 4; i++) {
@@ -129,20 +128,31 @@ char read_keypad(void) {
     return 0;
 }
 
+void reset_system(void) {
+    memset(password, 0, sizeof(password));
+    password_set = false;
+    lcd_cmd(0x01);
+    lcd_print("Nueva clave:");
+    lcd_cmd(0xC0); // segunda línea
+    memset(input, 0, sizeof(input));
+    input_index = 0;
+}
+
 // === MAIN ===
 int main(void) {
     init_LCD();
     init_keypad();
     init_PWM_PTB1();
 
-    lcd_print("Ingresa clave:");
+    lcd_print("Nueva clave:");
+    lcd_cmd(0xC0); // segunda línea
 
     while (1) {
         char key = read_keypad();
         if (key) {
             if (key >= '0' && key <= '9' && input_index < 4) {
                 input[input_index++] = key;
-                char tmp[2] = {key, '\0'};  // ← CORREGIDO
+                char tmp[2] = {key, '\0'};
                 lcd_print(tmp);
             } else if (key == 'A') {
                 input[4] = '\0';
@@ -151,35 +161,38 @@ int main(void) {
                     lcd_cmd(0x01);
                     lcd_print("Clave guardada");
                     password_set = true;
+                    delay_ms(1500);
+                    lcd_cmd(0x01);
+                    lcd_print("Ingresa clave:");
+                    lcd_cmd(0xC0);
                 } else {
                     if (strcmp(password, input) == 0) {
                         lcd_cmd(0x01);
                         lcd_print("Correcta :)");
 
-                        // Movimiento de 0° a 180°
                         for (int angle = 0; angle <= 180; angle += 10) {
                             set_servo_angle(angle);
                             delay_ms(300);
                         }
-
                         delay_ms(500);
-
-                        // Regreso de 180° a 0°
                         for (int angle = 180; angle >= 0; angle -= 10) {
                             set_servo_angle(angle);
                             delay_ms(300);
                         }
 
+                        delay_ms(1000);
+                        reset_system();
                     } else {
                         lcd_cmd(0x01);
                         lcd_print("Incorrecta :(");
+                        delay_ms(1500);
+                        lcd_cmd(0x01);
+                        lcd_print("Ingresa clave:");
+                        lcd_cmd(0xC0);
                     }
                 }
                 memset(input, 0, sizeof(input));
                 input_index = 0;
-                delay_ms(1500);
-                lcd_cmd(0x01);
-                lcd_print("Ingresa clave:");
             }
         }
     }
