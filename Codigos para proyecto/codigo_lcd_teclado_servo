@@ -161,7 +161,7 @@ int main(void) {
                     lcd_cmd(0x01);
                     lcd_print("Clave guardada");
                     password_set = true;
-                    delay_ms(1500);
+                    delay_ms(250);
                     lcd_cmd(0x01);
                     lcd_print("Ingresa clave:");
                     lcd_cmd(0xC0);
@@ -180,12 +180,12 @@ int main(void) {
                             delay_ms(300);
                         }
 
-                        delay_ms(1000);
+                        delay_ms(500);
                         reset_system();
                     } else {
                         lcd_cmd(0x01);
                         lcd_print("Incorrecta :(");
-                        delay_ms(1500);
+                        delay_ms(250);
                         lcd_cmd(0x01);
                         lcd_print("Ingresa clave:");
                         lcd_cmd(0xC0);
