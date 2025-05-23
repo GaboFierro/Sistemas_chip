@@ -1,28 +1,44 @@
 #include "MKL25Z4.h"
 
-#define PWM_FREQUENCY 50
-#define TPM1_MOD_VALUE (48000000 / PWM_FREQUENCY) // 960000 para 20ms
+#define FREQ_PWM 50                     // Frecuencia 50Hz (20ms)
+#define MOD_VALUE (48000000 / FREQ_PWM) // 960000 ciclos para 20ms
+#define MIN_PULSE 48000                // 1 ms en ciclos (0°)
+#define MAX_PULSE 96000                // 2 ms en ciclos (180°)
 
-void init_PWM_PTB1(void) {
+void init_PWM_servos(void) {
+    // Habilitar reloj para puerto B y TPM1
     SIM->SCGC5 |= SIM_SCGC5_PORTB_MASK;
     SIM->SCGC6 |= SIM_SCGC6_TPM1_MASK;
 
-    PORTB->PCR[1] &= ~PORT_PCR_MUX_MASK;
-    PORTB->PCR[1] |= PORT_PCR_MUX(3); // PTB1 como TPM1_CH1
+    // Configurar PTB0 (TPM1_CH0) y PTB1 (TPM1_CH1)
+    PORTB->PCR[0] = PORT_PCR_MUX(3);
+    PORTB->PCR[1] = PORT_PCR_MUX(3);
 
-    SIM->SOPT2 |= SIM_SOPT2_TPMSRC(1);
+    // Seleccionar fuente de reloj para TPMs
+    SIM->SOPT2 |= SIM_SOPT2_TPMSRC(1); // MCGFLLCLK 48MHz
 
-    TPM1->MOD = TPM1_MOD_VALUE - 1;
+    // Configurar periodo de TPM1 (20ms)
+    TPM1->MOD = MOD_VALUE - 1;
 
+    // Configurar canales en modo PWM edge-aligned
+    TPM1->CONTROLS[0].CnSC = TPM_CnSC_MSB_MASK | TPM_CnSC_ELSB_MASK;
     TPM1->CONTROLS[1].CnSC = TPM_CnSC_MSB_MASK | TPM_CnSC_ELSB_MASK;
-    TPM1->CONTROLS[1].CnV = 48000; // ángulo inicial 0°
 
+    // Ciclo inicial
+    TPM1->CONTROLS[0].CnV = MIN_PULSE;
+    TPM1->CONTROLS[1].CnV = MIN_PULSE;
+
+    // Iniciar TPM1 sin prescaler
     TPM1->SC = TPM_SC_CMOD(1) | TPM_SC_PS(0);
 }
 
-void set_servo_angle(int angle) {
-    uint32_t pulse_width = 48000 + (angle * (96000 - 48000)) / 180;
-    TPM1->CONTROLS[1].CnV = pulse_width;
+void set_servo_both(int angle) {
+    if (angle < 0) angle = 0;
+    if (angle > 180) angle = 180;
+    uint32_t pulse = MIN_PULSE + (angle * (MAX_PULSE - MIN_PULSE)) / 180;
+
+    TPM1->CONTROLS[0].CnV = pulse; // PTB0
+    TPM1->CONTROLS[1].CnV = pulse; // PTB1
 }
 
 void delay_ms(uint32_t ms) {
@@ -32,19 +48,23 @@ void delay_ms(uint32_t ms) {
 }
 
 int main(void) {
-    init_PWM_PTB1();
+    init_PWM_servos();
 
     while (1) {
-        // Subida de 0° a 180°
-        for (int angle = 0; angle <= 180; angle += 10) {
-            set_servo_angle(angle);
-            delay_ms(200); // Delay entre pasos
+        // Movimiento ascendente 0° a 180°
+        for (int angle = 0; angle <= 180; angle += 5) {
+            set_servo_both(angle);
+            delay_ms(50); // Delay para movimiento suave
         }
 
-        // Bajada de 180° a 0°
-        for (int angle = 180; angle >= 0; angle -= 10) {
-            set_servo_angle(angle);
-            delay_ms(200);
+        delay_ms(500); // Pausa en 180°
+
+        // Movimiento descendente 180° a 0°
+        for (int angle = 180; angle >= 0; angle -= 5) {
+            set_servo_both(angle);
+            delay_ms(50); // Delay para movimiento suave
         }
+
+        delay_ms(500); // Pausa en 0°
     }
 }
