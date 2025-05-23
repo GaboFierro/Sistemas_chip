@@ -18,25 +18,38 @@ char input[5] = "";
 bool password_set = false;
 int input_index = 0;
 
-// === SERVOMOTOR PTB1 ===
+// === SERVOMOTORES PTB0 y PTB1 ===
 #define PWM_FREQUENCY 50
 #define TPM1_MOD_VALUE (48000000 / PWM_FREQUENCY)
 
-void init_PWM_PTB1(void) {
+void init_PWM_servos(void) {
     SIM->SCGC5 |= SIM_SCGC5_PORTB_MASK;
     SIM->SCGC6 |= SIM_SCGC6_TPM1_MASK;
+
+    PORTB->PCR[0] = PORT_PCR_MUX(3); // PTB0 como TPM1_CH0
     PORTB->PCR[1] = PORT_PCR_MUX(3); // PTB1 como TPM1_CH1
+
     SIM->SOPT2 |= SIM_SOPT2_TPMSRC(1); // MCGFLLCLK
 
     TPM1->MOD = TPM1_MOD_VALUE - 1;
+
+    TPM1->CONTROLS[0].CnSC = TPM_CnSC_MSB_MASK | TPM_CnSC_ELSB_MASK;
     TPM1->CONTROLS[1].CnSC = TPM_CnSC_MSB_MASK | TPM_CnSC_ELSB_MASK;
+
+    TPM1->CONTROLS[0].CnV = 48000;
     TPM1->CONTROLS[1].CnV = 48000;
+
     TPM1->SC = TPM_SC_CMOD(1) | TPM_SC_PS(0);
 }
 
-void set_servo_angle(int angle) {
+void set_both_servos_same(int angle) {
+    if (angle < 0) angle = 0;
+    if (angle > 180) angle = 180;
+
     uint32_t pulse = 48000 + (angle * (96000 - 48000)) / 180;
-    TPM1->CONTROLS[1].CnV = pulse;
+
+    TPM1->CONTROLS[0].CnV = pulse; // PTB0
+    TPM1->CONTROLS[1].CnV = pulse; // PTB1
 }
 
 void delay_ms(uint32_t ms) {
@@ -133,7 +146,7 @@ void reset_system(void) {
     password_set = false;
     lcd_cmd(0x01);
     lcd_print("Nueva clave:");
-    lcd_cmd(0xC0); // segunda línea
+    lcd_cmd(0xC0);
     memset(input, 0, sizeof(input));
     input_index = 0;
 }
@@ -142,10 +155,10 @@ void reset_system(void) {
 int main(void) {
     init_LCD();
     init_keypad();
-    init_PWM_PTB1();
+    init_PWM_servos();
 
     lcd_print("Nueva clave:");
-    lcd_cmd(0xC0); // segunda línea
+    lcd_cmd(0xC0);
 
     while (1) {
         char key = read_keypad();
@@ -171,12 +184,14 @@ int main(void) {
                         lcd_print("Correcta :)");
 
                         for (int angle = 0; angle <= 180; angle += 10) {
-                            set_servo_angle(angle);
+                            set_both_servos_same(angle); // Ambos suben
                             delay_ms(300);
                         }
+
                         delay_ms(500);
+
                         for (int angle = 180; angle >= 0; angle -= 10) {
-                            set_servo_angle(angle);
+                            set_both_servos_same(angle); // Ambos bajan
                             delay_ms(300);
                         }
 
