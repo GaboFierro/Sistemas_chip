@@ -185,14 +185,14 @@ int main(void) {
 
                         for (int angle = 0; angle <= 180; angle += 10) {
                             set_both_servos_same(angle); // Ambos suben
-                            delay_ms(300);
+                            delay_ms(20);
                         }
 
                         delay_ms(500);
 
                         for (int angle = 180; angle >= 0; angle -= 10) {
                             set_both_servos_same(angle); // Ambos bajan
-                            delay_ms(300);
+                            delay_ms(20);
                         }
 
                         delay_ms(500);
