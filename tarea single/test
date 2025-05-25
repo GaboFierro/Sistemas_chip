@@ -1,0 +1,31 @@
+`timescale 1ns/1ps
+
+module tb_Single_cycle_RISCV;
+
+    reg clk;
+
+    Single_cycle_RISCV uut (
+        .clk(clk)
+    );
+
+    initial begin
+        clk = 0;
+        forever #5 clk = ~clk; 
+    end
+
+    initial begin
+        uut.IM.memory[0] = 32'h00000093; // ADDI x1, x0, 0
+        uut.IM.memory[1] = 32'h00100113; // ADDI x2, x0, 1
+        uut.IM.memory[2] = 32'h002081b3; // ADD  x3, x1, x2
+        uut.IM.memory[3] = 32'h00310223; // SW   x3, 0(x2)
+    end
+    initial begin
+        $display("Simulando...");
+        #50 $finish;
+    end
+
+    initial begin
+        $monitor("Tiempo=%0t | PC=%h | Inst=%h", $time, uut.PC, uut.Inst);
+    end
+
+endmodule
