@@ -1,0 +1,70 @@
+module control_unit (
+    input [6:0] op,
+    input [2:0] funct3,
+    input [6:0] funct7,
+    input zero,
+    output reg PCSrc,
+    output reg MemWrite,
+    output reg [2:0] ALUControl,
+    output reg ALUSrc,
+    output reg [1:0] ImmSrc,
+    output reg RegWrite,
+    output reg ResultSrc
+);
+
+    always @(*) begin
+        PCSrc      = 0;
+        MemWrite   = 0;
+        ALUControl = 3'b010;
+        ALUSrc     = 0;
+        ImmSrc     = 2'b00;
+        RegWrite   = 0;
+        ResultSrc  = 0;
+
+        case (op)
+            7'b0110011: begin 
+                ALUSrc     = 0;
+                RegWrite   = 1;
+                ResultSrc  = 0;
+                case (funct3)
+                    3'b000: ALUControl = (funct7 == 7'b0100000) ? 3'b110 : 3'b010; 
+                    3'b111: ALUControl = 3'b000; 
+                    3'b110: ALUControl = 3'b001; 
+                    default: ALUControl = 3'b111;
+                endcase
+            end
+            7'b0000011: begin 
+                ALUSrc     = 1;
+                RegWrite   = 1;
+                MemWrite   = 0;
+                ResultSrc  = 1;
+                ImmSrc     = 2'b00;
+                ALUControl = 3'b010;
+            end
+            7'b0100011: begin 
+                ALUSrc     = 1;
+                RegWrite   = 0;
+                MemWrite   = 1;
+                ImmSrc     = 2'b01;
+                ALUControl = 3'b010;
+            end
+            7'b1100011: begin 
+                ALUSrc     = 0;
+                RegWrite   = 0;
+                MemWrite   = 0;
+                ImmSrc     = 2'b10;
+                ALUControl = 3'b110;
+                PCSrc      = zero;
+            end
+            7'b0010011: begin
+                ALUSrc     = 1;
+                RegWrite   = 1;
+                ALUControl = 3'b010;
+                ImmSrc     = 2'b00;
+            end
+            default: begin
+                PCSrc = 0;
+            end
+        endcase
+    end
+endmodule
