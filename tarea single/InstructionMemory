@@ -1,0 +1,7 @@
+module instruction_memory #(parameter N=32)(
+    input [N-1:0] pc,
+    output [N-1:0] Instr
+);
+    reg [N-1:0] memory [0:255];
+    assign Instr = memory[pc[9:2]];
+endmodule
