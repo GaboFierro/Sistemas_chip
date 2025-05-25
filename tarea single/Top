@@ -1,0 +1,90 @@
+module Single_cycle_RISCV(
+    input clk
+);
+
+    wire [31:0] PCTarget;
+    wire [31:0] PCPlus4;
+    wire [31:0] Inst;
+    wire [31:0] PCNext;
+    wire [31:0] PC;
+
+    wire [31:0] SrcA;
+    wire [31:0] RD2;
+    wire [31:0] Result;
+    wire [31:0] ImmExt;
+    wire [31:0] SrcB;
+    wire [31:0] ReadData;
+    wire [31:0] ALUResult;
+    wire Zero;
+
+    wire RegWrite, MemWrite, ALUSrc, ResultSrc, PCSrc;
+    wire [2:0] ALUControl;
+    wire [1:0] ImmSrc;
+
+    reg [31:0] PC_reg;
+    assign PC = PC_reg;
+    always @(posedge clk) begin
+        PC_reg <= PCNext;
+    end
+
+    assign PCNext = PCSrc ? PCTarget : PCPlus4;
+    assign PCPlus4 = PC + 4;
+
+    instruction_memory IM(
+        .pc(PC),
+        .Instr(Inst)
+    );
+
+    Registerfile RF(
+        .clk(clk),
+        .A1(Inst[19:15]),
+        .A2(Inst[24:20]),
+        .A3(Inst[11:7]),
+        .WD3(Result),
+        .WE3(RegWrite),
+        .RD1(SrcA),
+        .RD2(RD2)
+    );
+
+    ImmediateGenerator IG(
+        .instr(Inst),
+        .imm_out(ImmExt)
+    );
+
+    assign SrcB = ALUSrc ? ImmExt : RD2;
+
+    ALU alu(
+        .A(SrcA),
+        .B(SrcB),
+        .ALUControl(ALUControl),
+        .Result(ALUResult),
+        .Zero(Zero)
+    );
+
+    Data_memory MEM_DATA(
+        .clk(clk),
+        .A(ALUResult),
+        .WD(RD2),
+        .WE(MemWrite),
+        .RD(ReadData)
+    );
+
+    assign Result = ResultSrc ? ReadData : ALUResult;
+
+    assign PCTarget = PC + ImmExt;
+
+    control_unit CONTROL(
+        .op(Inst[6:0]),
+        .funct3(Inst[14:12]),
+        .funct7(Inst[31:25]),
+        .zero(Zero),
+        .PCSrc(PCSrc),
+        .MemWrite(MemWrite),
+        .ALUControl(ALUControl),
+        .ALUSrc(ALUSrc),
+        .ImmSrc(ImmSrc),
+        .RegWrite(RegWrite),
+        .ResultSrc(ResultSrc)
+    );
+
+endmodule
