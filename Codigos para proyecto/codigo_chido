@@ -18,10 +18,10 @@ char input[5] = "";
 bool password_set = false;
 int input_index = 0;
 
-// === SERVOMOTORES PTB0 y PTB1 ===
 #define PWM_FREQUENCY 50
 #define TPM1_MOD_VALUE (48000000 / PWM_FREQUENCY)
 
+// === SERVOMOTORES PTB0 y PTB1 ===
 void init_PWM_servos(void) {
     SIM->SCGC5 |= SIM_SCGC5_PORTB_MASK;
     SIM->SCGC6 |= SIM_SCGC6_TPM1_MASK;
@@ -30,7 +30,6 @@ void init_PWM_servos(void) {
     PORTB->PCR[1] = PORT_PCR_MUX(3);
 
     SIM->SOPT2 |= SIM_SOPT2_TPMSRC(1);
-
     TPM1->MOD = TPM1_MOD_VALUE - 1;
 
     TPM1->CONTROLS[0].CnSC = TPM_CnSC_MSB_MASK | TPM_CnSC_ELSB_MASK;
@@ -47,7 +46,6 @@ void set_both_servos_same(int angle) {
     if (angle > 180) angle = 180;
 
     uint32_t pulse = 48000 + (angle * (96000 - 48000)) / 180;
-
     TPM1->CONTROLS[0].CnV = pulse;
     TPM1->CONTROLS[1].CnV = pulse;
 }
@@ -113,26 +111,37 @@ void init_LCD(void) {
     delay_ms(2);
 }
 
-// === TECLADO ===
+// === TECLADO MATRICIAL ===
+// Filas: PTE5, PTE4, PTE3, PTE2
+// Columnas: PTB11, PTB10, PTB9, PTB8
+
 void init_keypad(void) {
-    SIM->SCGC5 |= SIM_SCGC5_PORTC_MASK;
-    for (int i = 0; i < 4; i++) {
-        PORTC->PCR[i] = PORT_PCR_MUX(1);
-        PTC->PDDR |= (1 << i);
+    SIM->SCGC5 |= SIM_SCGC5_PORTE_MASK | SIM_SCGC5_PORTB_MASK;
+
+    // Filas como salida (PTE5 - PTE2)
+    for (int i = 2; i <= 5; i++) {
+        PORTE->PCR[i] = PORT_PCR_MUX(1);
+        PTE->PDDR |= (1 << i);
     }
-    for (int i = 4; i < 8; i++) {
-        PORTC->PCR[i] = PORT_PCR_MUX(1) | PORT_PCR_PE_MASK | PORT_PCR_PS_MASK;
-        PTC->PDDR &= ~(1 << i);
+
+    // Columnas como entrada con pull-up (PTB11 - PTB8)
+    for (int i = 8; i <= 11; i++) {
+        PORTB->PCR[i] = PORT_PCR_MUX(1) | PORT_PCR_PE_MASK | PORT_PCR_PS_MASK;
+        PTB->PDDR &= ~(1 << i);
     }
 }
 
 char read_keypad(void) {
     for (int row = 0; row < 4; row++) {
-        PTC->PSOR = 0x0F;
-        PTC->PCOR = (1 << row);
+        // Apagar todas las filas
+        PTE->PSOR = (1 << 2) | (1 << 3) | (1 << 4) | (1 << 5);
+        // Activar solo la fila actual
+        PTE->PCOR = (1 << (5 - row));  // fila 0 → PTE5, fila 1 → PTE4, etc.
         delay_ms(2);
+
         for (int col = 0; col < 4; col++) {
-            if (!(PTC->PDIR & (1 << (col + 4)))) {
+            int col_pin = 11 - col; // col 0 → PTB11, col 1 → PTB10, etc.
+            if (!(PTB->PDIR & (1 << col_pin))) {
                 delay_ms(200);
                 return keys[row][col];
             }
@@ -151,7 +160,6 @@ void reset_system(void) {
     input_index = 0;
 }
 
-// === MAIN ===
 int main(void) {
     init_LCD();
     init_keypad();
