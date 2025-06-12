@@ -1,0 +1,63 @@
+#include "MKL25Z4.h"
+
+#define PWM_FREQUENCY 2000         
+#define SYSTEM_CLOCK 48000000      
+#define TPM2_MOD_VALUE (SYSTEM_CLOCK / PWM_FREQUENCY)
+
+void delay_ms(uint32_t ms) {
+    SysTick->LOAD = (SYSTEM_CLOCK / 1000) - 1;
+    SysTick->VAL = 0;
+    SysTick->CTRL = SysTick_CTRL_CLKSOURCE_Msk | SysTick_CTRL_ENABLE_Msk;
+
+    for (uint32_t i = 0; i < ms; i++) {
+        while ((SysTick->CTRL & SysTick_CTRL_COUNTFLAG_Msk) == 0);
+    }
+
+    SysTick->CTRL = 0;
+}
+
+void init_buzzer_pwm(void) {
+    // Habilitar reloj para puerto B y TPM2
+    SIM->SCGC5 |= SIM_SCGC5_PORTB_MASK;
+    SIM->SCGC6 |= SIM_SCGC6_TPM2_MASK;
+
+    // Configurar PTB3 como TPM2_CH1 (ALT3)
+    PORTB->PCR[3] = PORT_PCR_MUX(3);
+
+    // Seleccionar MCGFLLCLK (48 MHz) como fuente del TPM
+    SIM->SOPT2 |= SIM_SOPT2_TPMSRC(1);
+
+    // Configuración TPM2
+    TPM2->SC = 0;
+    TPM2->MOD = TPM2_MOD_VALUE - 1;
+
+    // Canal 1 como edge-aligned PWM, high-true pulses
+    TPM2->CONTROLS[1].CnSC = TPM_CnSC_MSB_MASK | TPM_CnSC_ELSB_MASK;
+
+    // Habilitar TPM2 (modo up, prescaler = 1)
+    TPM2->SC = TPM_SC_CMOD(1) | TPM_SC_PS(0);
+}
+
+void sound_buzzer(void) {
+    // Establecer duty cycle al 50%
+    TPM2->CONTROLS[1].CnSC = TPM_CnSC_MSB_MASK | TPM_CnSC_ELSB_MASK;
+    TPM2->CONTROLS[1].CnV = TPM2_MOD_VALUE / 2;
+}
+
+void stop_buzzer(void) {
+    // Desactivar canal limpiando CnSC
+    TPM2->CONTROLS[1].CnSC = 0;
+    TPM2->CONTROLS[1].CnV = 0;
+}
+
+int main(void) {
+    init_buzzer_pwm();
+
+    while (1) {
+        sound_buzzer();     // 🔊 Suena medio segundo
+        delay_ms(500);
+
+        stop_buzzer();      // 🤫 Calla 1 segundo
+        delay_ms(1000);
+    }
+}
