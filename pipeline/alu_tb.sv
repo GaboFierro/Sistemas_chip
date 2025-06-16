@@ -1,6 +1,6 @@
 `timescale 1ns/1ps
 
-module alutb_;
+module alu_tb;
   reg [31:0] a;
   reg [31:0] b;
   reg [2:0] alucontrol;
