@@ -1,5 +1,5 @@
 `timescale 1ns/1ps
-module tb_extend;
+module extend_tb;
   reg [31:0] full_instr;
   reg [1:0] immsrc;
   wire [31:0] immext;
