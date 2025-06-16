@@ -1,5 +1,5 @@
 `timescale 1ns/1ps
-module tb_flopenr;
+module flopenr_tb;
   reg clk;
   reg reset;
   reg en;
