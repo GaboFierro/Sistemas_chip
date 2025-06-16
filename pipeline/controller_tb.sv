@@ -1,5 +1,5 @@
 `timescale 1ns/1ps
-module tb_controller;
+module controller_tb;
   reg [6:0] op;
   reg [2:0] funct3;
   reg funct7b5, Zero;
