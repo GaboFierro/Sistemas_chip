@@ -1,5 +1,5 @@
 `timescale 1ns/1ps
-module tb_dmem;
+module dmem_tb;
 reg clk, we;
 reg [31:0] a, wd;
 wire [31:0] rd;
