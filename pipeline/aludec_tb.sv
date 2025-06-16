@@ -1,5 +1,5 @@
 `timescale 1ns/1ps
-module tb_aludec;
+module aludec_tb;
  reg [1:0] ALUOp;
  reg funct7b5;
  reg [2:0] funct3;
